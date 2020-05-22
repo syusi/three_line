@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import TextBox
 import inspect
+import random
 
 # ゲームに必要なパラメーター
 EMPTY = -9999
@@ -10,6 +11,9 @@ EMPTY = -9999
 nowTurn = 0
 ## [[EMPTY]*3]*3だと同じリストを参照してしまう
 board_status = [[EMPTY]*3,[EMPTY]*3,[EMPTY]*3]
+
+## CPUモードにするか
+CPU_MODE = True
 
 #表示に必要なもの
 ##各盤面
@@ -55,18 +59,46 @@ def submit(text):
         print("already put mark:",input_num)
         return
     
+    put_piece(input_num)
+    if game_condition(input_num):
+        return
+    
+    #ターン変更
+    nowTurn = (nowTurn+1)%2
+    #CPUモードならとりあえず敵に置かせる。
+    if CPU_MODE:
+        print('enemy')
+        enemy_put = random_enemy(board_status)
+        put_piece(enemy_put)
+        if game_condition(enemy_put):
+            return
+        #元のターンに戻す
+        nowTurn = (nowTurn+1)%2
+        print(board_status)
+    # そうではないならユーザーの次のターンに変更
+    else:
+        turn_chara = '○' if nowTurn==0 else '×'
+        text_box.label.set_text('Trun '+turn_chara+' input number!')
+    text_box.set_val("")
+    plt.draw()
+
+def put_piece(put_pos):
     # boardの更新
+    pos_x,pos_y = row_to_xy(put_pos)
     board_status[pos_y][pos_x] = nowTurn
     turn_chara = '○' if nowTurn==0 else '×'
-    cell = cells[input_num]
+    cell = cells[put_pos]
     cell.cla()
     cell.text(0.35,0.35,turn_chara,size = 40,color="blue")
 
+# 続けるならFalse、勝敗が決まればTrue
+def game_condition(put_num):
+    turn_chara = '○' if nowTurn==0 else '×'
     # 勝敗の判定
-    if WinCondition(board_status,input_num):
+    if WinCondition(board_status,put_num):
         print("win !"+turn_chara)
         plt.draw()
-        return
+        return True
         
     for y in range(len(board_status)):
         if EMPTY in board_status[y]:
@@ -74,14 +106,9 @@ def submit(text):
     else:
         print("Draw...")
         plt.draw()
-        return 
-
-    # 次のターンに変更
-    nowTurn = (nowTurn+1)%2
-    turn_chara = '○' if nowTurn==0 else '×'
-    text_box.set_val("")
-    text_box.label.set_text('Trun '+turn_chara+' input number!')
-    plt.draw()
+        return True
+    
+    return False
 
 def row_to_xy(pos):
     x = int(pos%3)
@@ -90,6 +117,23 @@ def row_to_xy(pos):
 
 def xy_to_row(x,y):
     return y*3+x
+
+
+def random_enemy(board_status):
+
+    left_cell = []
+    
+    for y in range(len(board_status)):
+        for x in range(len(board_status[y])):
+            if board_status[y][x] == EMPTY:
+                left_cell.append(xy_to_row(x,y))
+    
+    index = random.randint(0,len(left_cell)-1)
+
+    return left_cell[index]
+
+
+
 
 # def show_play(now_area):
 
@@ -121,7 +165,7 @@ def WinCondition(board_status,put_pos):
             if x_diff == 0 and y_diff == 0:
                 break
 
-            ren = putricurution(board_status,(y_diff,x_diff),pos_x,pos_y,color,0)
+            ren = putricurution(board_status,(x_diff,y_diff),pos_x,pos_y,color,0)
             print("ren :"+str(ren))
             if ren >= 3:
                 return True
@@ -130,7 +174,7 @@ def WinCondition(board_status,put_pos):
 
 
 def putricurution(board_status,vector,pos_x,pos_y,color,ren):
-    #print("x:",pos_x," y:",pos_y)
+    print("x:",pos_x," y:",pos_y)
     if pos_x >= 0 and pos_x < 3:
         if pos_y >= 0 and pos_y < 3:
             if board_status[pos_y][pos_x] == color:
