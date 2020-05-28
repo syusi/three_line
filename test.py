@@ -21,6 +21,10 @@ cells = []
 ##テキストボックス
 text_box = None
 
+# 強化学習に必要な奴
+## テーブルの初期化、期待値なので0-1?サイズは各マスに○×無しの3通りが8個、その時にどこに置くかで8個
+qtable = np.random.randint(low = 0,high = 1,size=(3**8,8))
+
 
 def init_figure():
     fig = plt.figure()
@@ -36,9 +40,9 @@ def init_figure():
     global text_box
     text_box = TextBox(axbox, 'Trun ○ input number!')
     text_box.on_submit(submit)
-    print(type(text_box))
-    for x in inspect.getmembers(text_box):
-        print(x)
+    # print(type(text_box))
+    # for x in inspect.getmembers(text_box):
+    #     print(x)
     plt.show()
 
 def submit(text):
@@ -82,14 +86,23 @@ def submit(text):
     text_box.set_val("")
     plt.draw()
 
+def put_board(put_pos):
+    pos_x,pos_y = row_to_xy(put_pos)
+    if board_status[pos_y][pos_x] != EMPTY:
+        return False
+    board_status[pos_y][pos_x] = nowTurn
+    return True
+
 def put_piece(put_pos):
     # boardの更新
-    pos_x,pos_y = row_to_xy(put_pos)
-    board_status[pos_y][pos_x] = nowTurn
+    if put_board(put_pos) == False:
+        return False
     turn_chara = '○' if nowTurn==0 else '×'
     cell = cells[put_pos]
     cell.cla()
     cell.text(0.35,0.35,turn_chara,size = 40,color="blue")
+    return True
+
 
 # 続けるならFalse、勝敗が決まればTrue
 def game_condition(put_num):
@@ -99,15 +112,12 @@ def game_condition(put_num):
         print("win !"+turn_chara)
         plt.draw()
         return True
-        
-    for y in range(len(board_status)):
-        if EMPTY in board_status[y]:
-            break 
-    else:
+    
+    if drowCondition(put_num):
         print("Draw...")
         plt.draw()
         return True
-    
+
     return False
 
 def row_to_xy(pos):
@@ -117,6 +127,28 @@ def row_to_xy(pos):
 
 def xy_to_row(x,y):
     return y*3+x
+
+
+# 学習用変数
+episord = 1000
+
+def learn(learn, other):
+    win=0
+    lose=0
+    drow=0
+    for epi in range(episord):
+        #最初の手を決める
+        state = dizitize_state(board_status)
+        action = np.argmax(qtable[state])
+        while True:
+            print('first')
+            reward = 0
+            can_put = put_board(action)
+            if can_put == False:
+                reward = -50
+            action,state = q_enemy(board_status,state,action,reward,episord)
+            if game_condition(enemy_put):
+                continue
 
 
 def random_enemy(board_status):
@@ -132,8 +164,32 @@ def random_enemy(board_status):
 
     return left_cell[index]
 
+def dizitize_state(board_status):
+    # 無し0、○1、×2
+    sum = 0
+    for index in range(9):
+        x,y = row_to_xy(index)
+        put = 0 if board_status[y][x] == EMPTY else board_status[y][x] + 1
+        print('num:',put * 3 ** index)
+        sum += put * 3 ** index
+    return sum
 
+def q_enemy(board_status,state,action,reward,epsode):
+    
+    # 今の状態を把握
+    next_state = dizitize_state(board_status)
 
+    # 次のアクションを決める
+    ## 一番良いやつ
+    next_action = np.argmax(board_status[next_state])
+
+    alpha = 0.2
+    gamma = 0.99
+    qtable[state,action] = (1 - alpha) * qtable[state,action] +\
+         alpha *  (reward + gamma * qtable[next_state,next_action])
+
+    return next_action,next_state
+    
 
 # def show_play(now_area):
 
@@ -166,15 +222,22 @@ def WinCondition(board_status,put_pos):
                 break
 
             ren = putricurution(board_status,(x_diff,y_diff),pos_x,pos_y,color,0)
-            print("ren :"+str(ren))
             if ren >= 3:
                 return True
     
     return False
 
+def drowCondition(put_pos):
+    for y in range(len(board_status)):
+        if EMPTY in board_status[y]:
+            break 
+    else:
+        print("Draw...")
+        plt.draw()
+        return True
+    return False
 
 def putricurution(board_status,vector,pos_x,pos_y,color,ren):
-    print("x:",pos_x," y:",pos_y)
     if pos_x >= 0 and pos_x < 3:
         if pos_y >= 0 and pos_y < 3:
             if board_status[pos_y][pos_x] == color:
