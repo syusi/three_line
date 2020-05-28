@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import TextBox
 import inspect
 import random
+from enum import Enum
 
 # ゲームに必要なパラメーター
 EMPTY = -9999
@@ -23,7 +24,7 @@ text_box = None
 
 # 強化学習に必要な奴
 ## テーブルの初期化、期待値なので0-1?サイズは各マスに○×無しの3通りが8個、その時にどこに置くかで8個
-qtable = np.random.randint(low = 0,high = 1,size=(3**8,8))
+qtable = np.random.uniform(low = -1,high = 1,size=(3**9,8))
 
 
 def init_figure():
@@ -86,6 +87,7 @@ def submit(text):
     text_box.set_val("")
     plt.draw()
 
+# 盤面に置く。置けたらTrue置けなかったらFalse
 def put_board(put_pos):
     pos_x,pos_y = row_to_xy(put_pos)
     if board_status[pos_y][pos_x] != EMPTY:
@@ -129,14 +131,25 @@ def xy_to_row(x,y):
     return y*3+x
 
 
+class WHOWIN(Enum):
+    IAM = 1
+    ENEMY = 2
+    DROW  = 3
+
 # 学習用変数
 episord = 1000
 
-def learn(learn, other):
+
+def learn():
     win=0
     lose=0
     drow=0
+    global nowTurn
+    global board_status
     for epi in range(episord):
+        who_win = WHOWIN.DROW
+        nowTurn = 0
+        board_status = [[EMPTY]*3,[EMPTY]*3,[EMPTY]*3]
         #最初の手を決める
         state = dizitize_state(board_status)
         action = np.argmax(qtable[state])
@@ -145,10 +158,42 @@ def learn(learn, other):
             reward = 0
             can_put = put_board(action)
             if can_put == False:
-                reward = -50
-            action,state = q_enemy(board_status,state,action,reward,episord)
-            if game_condition(enemy_put):
+                reward = -1000
+                action,state = q_enemy(board_status,state,action,reward,epi)
                 continue
+            if WinCondition(board_status ,action):
+                reward = 100
+                action,state = q_enemy(board_status,state,action,reward,epi)
+                who_win = WHOWIN.IAM
+                break
+            if drowCondition(action):
+                reward = -30
+                action,state = q_enemy(board_status,state,action,reward,epi)
+                who_win = WHOWIN.DROW
+                break
+            nowTurn = (nowTurn+1)%2
+            print("enemy")
+            enemy_put = random_enemy(board_status)
+            put_board(enemy_put)
+            if game_condition(enemy_put):
+                reward = -100
+                action,state = q_enemy(board_status,state,action,reward,epi)
+                who_win = WHOWIN.ENEMY
+                break
+            #元のターンに戻す
+            nowTurn = (nowTurn+1)%2
+            print(board_status)
+            input()
+            action,state = q_enemy(board_status,state,action,reward,epi)
+        
+        if who_win == WHOWIN.IAM:
+            win+=1
+        elif who_win == WHOWIN.ENEMY:
+            lose += 1
+        else:
+            drow+=1
+        print(board_status)
+        print("win:",win," lose:",lose," drow",drow)
 
 
 def random_enemy(board_status):
@@ -170,24 +215,26 @@ def dizitize_state(board_status):
     for index in range(9):
         x,y = row_to_xy(index)
         put = 0 if board_status[y][x] == EMPTY else board_status[y][x] + 1
-        print('num:',put * 3 ** index)
+        #print('num:',put * 3 ** index)
         sum += put * 3 ** index
     return sum
 
 def q_enemy(board_status,state,action,reward,epsode):
     
-    # 今の状態を把握
+    print("nowstate:",state)
+    # 次の状態を把握
     next_state = dizitize_state(board_status)
 
     # 次のアクションを決める
     ## 一番良いやつ
-    next_action = np.argmax(board_status[next_state])
+    next_action = np.argmax(qtable[next_state])
 
     alpha = 0.2
     gamma = 0.99
     qtable[state,action] = (1 - alpha) * qtable[state,action] +\
          alpha *  (reward + gamma * qtable[next_state,next_action])
 
+    print(qtable[state])
     return next_action,next_state
     
 
@@ -219,9 +266,11 @@ def WinCondition(board_status,put_pos):
     for y_diff in range(-1,2):
         for x_diff in range(-1,2):
             if x_diff == 0 and y_diff == 0:
-                break
+                return False
 
             ren = putricurution(board_status,(x_diff,y_diff),pos_x,pos_y,color,0)
+            # 対局も調べる。この時、自分も含んでしまうのでマイナス1
+            ren += putricurution(board_status,(-x_diff,-y_diff),pos_x,pos_y,color,0)-1
             if ren >= 3:
                 return True
     
@@ -276,4 +325,5 @@ def putricurution(board_status,vector,pos_x,pos_y,color,ren):
 #     print("GAMSE SET!!")
 
 # #gameLoop()
-init_figure()
+#init_figure()
+learn()
