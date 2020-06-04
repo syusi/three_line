@@ -23,8 +23,8 @@ cells = []
 text_box = None
 
 # 強化学習に必要な奴
-## テーブルの初期化、期待値なので0-1?サイズは各マスに○×無しの3通りが8個、その時にどこに置くかで8個
-qtable = np.random.uniform(low = -1,high = 1,size=(3**9,8))
+## テーブルの初期化、期待値なので0-1?サイズは各マスに○×無しの3通りが8個、その時にどこに置くかで9個
+qtable = np.random.uniform(low = -1,high = 1,size=(3**9,9))
 
 
 def init_figure():
@@ -137,8 +137,8 @@ class WHOWIN(Enum):
     DROW  = 3
 
 # 学習用変数
-episord = 1000
-
+episord = 5000
+loopcount = 0
 
 def learn():
     win=0
@@ -153,13 +153,19 @@ def learn():
         #最初の手を決める
         state = dizitize_state(board_status)
         action = np.argmax(qtable[state])
+        loopcount = 0
         while True:
-            print('first')
+            #print('first')
             reward = 0
             can_put = put_board(action)
             if can_put == False:
                 reward = -1000
                 action,state = q_enemy(board_status,state,action,reward,epi)
+                #print("act:",action," state",state)
+                # loopcount += 1
+                # if loopcount > 10:
+                #     print("state:",board_status," act:",action)
+                #     input()
                 continue
             if WinCondition(board_status ,action):
                 reward = 100
@@ -172,7 +178,7 @@ def learn():
                 who_win = WHOWIN.DROW
                 break
             nowTurn = (nowTurn+1)%2
-            print("enemy")
+            #print("enemy")
             enemy_put = random_enemy(board_status)
             put_board(enemy_put)
             if game_condition(enemy_put):
@@ -183,7 +189,7 @@ def learn():
             #元のターンに戻す
             nowTurn = (nowTurn+1)%2
             print(board_status)
-            input()
+            #input()
             action,state = q_enemy(board_status,state,action,reward,epi)
         
         if who_win == WHOWIN.IAM:
@@ -192,8 +198,11 @@ def learn():
             lose += 1
         else:
             drow+=1
-        print(board_status)
-        print("win:",win," lose:",lose," drow",drow)
+        #print(board_status)
+
+        if epi%1000 == 0:
+            print("win:",win," lose:",lose," drow",drow)
+            input()
 
 
 def random_enemy(board_status):
@@ -229,7 +238,7 @@ def q_enemy(board_status,state,action,reward,epsode):
     ## 一番良いやつ
     next_action = np.argmax(qtable[next_state])
 
-    alpha = 0.2
+    alpha = 0.5
     gamma = 0.99
     qtable[state,action] = (1 - alpha) * qtable[state,action] +\
          alpha *  (reward + gamma * qtable[next_state,next_action])
@@ -324,6 +333,59 @@ def putricurution(board_status,vector,pos_x,pos_y,color,ren):
 #         nowTurn = (nowTurn+1)%2
 #     print("GAMSE SET!!")
 
+def play():
+    global nowTurn
+    global board_status
+    qtable = np.load('qlearn05.npy')
+    who_win = WHOWIN.DROW
+    board_status = [[EMPTY]*3,[EMPTY]*3,[EMPTY]*3]
+    #最初の手を決める
+    state = dizitize_state(board_status)
+    action = np.argmax(qtable[state])
+    epi = 0
+    while True:
+        print('first')
+        reward = 0
+        can_put = put_board(action)
+        if can_put == False:
+            reward = -1000
+            action,state = q_enemy(board_status,state,action,reward,epi)
+            print("act:",action," state",state)
+            # loopcount += 1
+            # if loopcount > 10:
+            #     print("state:",board_status," act:",action)
+            #     input()
+            continue
+        if WinCondition(board_status ,action):
+            reward = 100
+            action,state = q_enemy(board_status,state,action,reward,epi)
+            print("enemy win")
+            break
+        if drowCondition(action):
+            reward = -30
+            action,state = q_enemy(board_status,state,action,reward,epi)
+            who_win = WHOWIN.DROW
+            print("enemy drow")
+            break
+        nowTurn = (nowTurn+1)%2
+        print("my")
+        print(board_status)
+        enemy_put = int(input())
+        put_board(enemy_put)
+        if game_condition(enemy_put):
+            reward = -100
+            action,state = q_enemy(board_status,state,action,reward,epi)
+            who_win = WHOWIN.ENEMY
+            print("player win")
+            break
+        #元のターンに戻す
+        nowTurn = (nowTurn+1)%2
+        print(board_status)
+        #input()
+        action,state = q_enemy(board_status,state,action,reward,epi)
+
 # #gameLoop()
 #init_figure()
-learn()
+#learn()
+#np.save('./qlearn05',qtable)
+play()
