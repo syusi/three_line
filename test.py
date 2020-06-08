@@ -41,9 +41,18 @@ def init_figure():
     global text_box
     text_box = TextBox(axbox, 'Trun ○ input number!')
     text_box.on_submit(submit)
-    # print(type(text_box))
-    # for x in inspect.getmembers(text_box):
-    #     print(x)
+
+    #先手の○を敵にする
+    global nowTurn
+    state = dizitize_state(board_status)
+    action = np.argmax(qtable[state])
+    canput = put_piece(action)
+    nowTurn = (nowTurn+1)%2
+    while canput == False:
+        reward = -1000
+        action,state = q_enemy(board_status,state,action,reward,0)
+        canput = put_piece(action)
+        nowTurn = (nowTurn+1)%2
     plt.show()
 
 def submit(text):
@@ -73,9 +82,14 @@ def submit(text):
     #CPUモードならとりあえず敵に置かせる。
     if CPU_MODE:
         print('enemy')
-        enemy_put = random_enemy(board_status)
-        put_piece(enemy_put)
-        if game_condition(enemy_put):
+        state = dizitize_state(board_status)
+        action = np.argmax(qtable[state])
+        canput = put_piece(action)
+        while canput == False:
+            reward = -1000
+            action,state = q_enemy(board_status,state,action,reward,0)
+            canput = put_piece(action)
+        if game_condition(action):
             return
         #元のターンに戻す
         nowTurn = (nowTurn+1)%2
@@ -333,7 +347,7 @@ def putricurution(board_status,vector,pos_x,pos_y,color,ren):
 #         nowTurn = (nowTurn+1)%2
 #     print("GAMSE SET!!")
 
-def play():
+def console_play():
     global nowTurn
     global board_status
     qtable = np.load('qlearn05.npy')
@@ -384,8 +398,13 @@ def play():
         #input()
         action,state = q_enemy(board_status,state,action,reward,epi)
 
-# #gameLoop()
+def gui_play():
+    global qtable
+    qtable = np.load('qlearn05.npy')
+    init_figure()
+
 #init_figure()
 #learn()
 #np.save('./qlearn05',qtable)
-play()
+#console_play()
+gui_play()
