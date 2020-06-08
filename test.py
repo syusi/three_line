@@ -350,6 +350,7 @@ def putricurution(board_status,vector,pos_x,pos_y,color,ren):
 def console_play():
     global nowTurn
     global board_status
+    global qtable
     qtable = np.load('qlearn05.npy')
     who_win = WHOWIN.DROW
     board_status = [[EMPTY]*3,[EMPTY]*3,[EMPTY]*3]
@@ -403,7 +404,6 @@ def gui_play():
     qtable = np.load('qlearn05.npy')
     init_figure()
 
-#init_figure()
 #learn()
 #np.save('./qlearn05',qtable)
 #console_play()
