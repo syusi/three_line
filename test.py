@@ -87,8 +87,9 @@ def submit(text):
         canput = put_piece(action)
         while canput == False:
             reward = -1000
-            action,state = q_enemy(board_status,state,action,reward,0)
+            action,state = play_enemy(board_status)
             canput = put_piece(action)
+            print(canput)
         if game_condition(action):
             return
         #元のターンに戻す
@@ -151,7 +152,7 @@ class WHOWIN(Enum):
     DROW  = 3
 
 # 学習用変数
-episord = 5000
+episord = 20000
 loopcount = 0
 
 def learn():
@@ -214,7 +215,7 @@ def learn():
             drow+=1
         #print(board_status)
 
-        if epi%1000 == 0:
+        if epi%10000 == 0:
             print("win:",win," lose:",lose," drow",drow)
             input()
 
@@ -252,6 +253,14 @@ def q_enemy(board_status,state,action,reward,epsode):
     ## 一番良いやつ
     next_action = np.argmax(qtable[next_state])
 
+    #epsilon = 0.2
+    epsilon = 0.5 * (0.99 * epsode)
+
+    if  epsilon <= np.random.uniform(0, 1):
+        next_action = np.argmax(qtable[next_state])
+    else:
+        next_action = np.random.choice([i for i in range(9)])
+
     alpha = 0.5
     gamma = 0.99
     qtable[state,action] = (1 - alpha) * qtable[state,action] +\
@@ -260,6 +269,12 @@ def q_enemy(board_status,state,action,reward,epsode):
     print(qtable[state])
     return next_action,next_state
     
+def play_enemy(board_status):
+    next_state = dizitize_state(board_status)
+    next_action = np.argmax(qtable[next_state])
+
+    print('action:',next_action,'states:',qtable[next_state])
+    return next_action,next_state
 
 # def show_play(now_area):
 
@@ -401,10 +416,10 @@ def console_play():
 
 def gui_play():
     global qtable
-    qtable = np.load('qlearn05.npy')
+    qtable = np.load('qlearngreedy.npy')
     init_figure()
 
 #learn()
-#np.save('./qlearn05',qtable)
+#np.save('./qlearngreedy',qtable)
 #console_play()
 gui_play()
